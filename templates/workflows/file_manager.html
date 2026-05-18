@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- 返回链接 -->
+<div class="mb-3">
+    <a href="{% url 'instance_detail' instance.id %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>返回审批详情
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- 左侧：文件夹树 -->
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-folder2-open me-2 text-warning"></i>文件夹
+            </div>
+            <div class="card-body" style="padding:8px 0;">
+                {% for folder in folders %}
+                <a href="#folder-{{ folder.step }}"
+                   class="d-flex align-items-center gap-2 px-4 py-2 text-decoration-none folder-link"
+                   style="color:#374151; font-size:13.5px; transition:background 0.15s;"
+                   onclick="showFolder({{ folder.step }}, this)">
+                    <i class="bi bi-folder-fill" style="color:#f59e0b; font-size:15px;"></i>
+                    <span>{{ folder.label }}</span>
+                    <span class="ms-auto badge bg-secondary" style="font-size:11px;">{{ folder.files|length }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 申请信息摘要 -->
+        <div class="card mt-3">
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>申请信息</div>
+            <div class="card-body" style="padding:14px 16px; font-size:13px;">
+                <div class="mb-2"><span style="color:#94a3b8;">申请人：</span>{{ instance.applicant }}</div>
+                <div class="mb-2"><span style="color:#94a3b8;">流程：</span>{{ instance.process.name }}</div>
+                <div>
+                    <span style="color:#94a3b8;">状态：</span>
+                    {% if instance.status == 'pending' %}<span class="badge bg-warning">审批中</span>
+                    {% elif instance.status == 'approved' %}<span class="badge bg-success">已通过</span>
+                    {% elif instance.status == 'rejected' %}<span class="badge bg-danger">已驳回</span>
+                    {% elif instance.status == 'withdrawn' %}<span class="badge bg-secondary">已撤回</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：文件列表 -->
+    <div class="col-lg-9">
+        {% for folder in folders %}
+        <div id="folder-{{ folder.step }}" class="folder-panel {% if not forloop.first %}d-none{% endif %}">
+            <div class="card">
+                <div class="card-header">
+                    <span>
+                        <i class="bi bi-folder2-open me-2 text-warning"></i>{{ folder.label }}
+                    </span>
+                    <span class="text-muted" style="font-size:12px; font-weight:400;">{{ folder.files|length }} 个文件</span>
+                </div>
+                <div class="card-body">
+                    {% if folder.files %}
+                    <div class="d-flex flex-column gap-2" style="padding:8px 0;">
+                        {% for att in folder.files %}
+                        <div class="d-flex align-items-center gap-3 px-4 py-3 rounded" style="background:#f8fafc; border:1px solid #e8edf5;">
+                            <!-- 文件图标 -->
+                            <div style="width:40px; height:40px; border-radius:10px; background:#eff6ff; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                {% with att.filename|lower as fn %}
+                                {% if '.pdf' in fn %}
+                                    <i class="bi bi-file-earmark-pdf-fill" style="color:#ef4444; font-size:18px;"></i>
+                                {% elif '.doc' in fn or '.docx' in fn %}
+                                    <i class="bi bi-file-earmark-word-fill" style="color:#2563eb; font-size:18px;"></i>
+                                {% elif '.xls' in fn or '.xlsx' in fn %}
+                                    <i class="bi bi-file-earmark-excel-fill" style="color:#16a34a; font-size:18px;"></i>
+                                {% elif '.ppt' in fn or '.pptx' in fn %}
+                                    <i class="bi bi-file-earmark-ppt-fill" style="color:#ea580c; font-size:18px;"></i>
+                                {% elif '.png' in fn or '.jpg' in fn or '.jpeg' in fn %}
+                                    <i class="bi bi-file-earmark-image-fill" style="color:#7c3aed; font-size:18px;"></i>
+                                {% else %}
+                                    <i class="bi bi-file-earmark-fill" style="color:#64748b; font-size:18px;"></i>
+                                {% endif %}
+                                {% endwith %}
+                            </div>
+                            <!-- 文件信息 -->
+                            <div class="flex-grow-1" style="min-width:0;">
+                                <div style="font-size:14px; color:#1a202c; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                    {{ att.filename }}
+                                </div>
+                                <div style="font-size:12px; color:#94a3b8; margin-top:2px;">
+                                    上传人：{{ att.uploaded_by }} &nbsp;·&nbsp; {{ att.uploaded_at|date:"Y-m-d H:i" }}
+                                </div>
+                            </div>
+                            <!-- 下载按钮 -->
+                            <a href="{{ att.file.url }}" class="btn btn-sm btn-outline-primary" target="_blank" style="flex-shrink:0;">
+                                <i class="bi bi-download me-1"></i>下载
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="bi bi-folder" style="font-size:36px; color:#cbd5e1;"></i>
+                        <p style="color:#94a3b8; margin-top:10px;">该文件夹暂无文件</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.folder-link:hover { background: #f1f5f9; }
+.folder-link.active { background: #eff6ff; color: #2563eb !important; }
+.folder-link.active i.bi-folder-fill { color: #2563eb !important; }
+</style>
+
+<script>
+function showFolder(step, el) {
+    document.querySelectorAll('.folder-panel').forEach(p => p.classList.add('d-none'));
+    document.querySelectorAll('.folder-link').forEach(l => l.classList.remove('active'));
+    document.getElementById('folder-' + step).classList.remove('d-none');
+    el.classList.add('active');
+}
+// 默认激活第一个
+document.addEventListener('DOMContentLoaded', function() {
+    const first = document.querySelector('.folder-link');
+    if (first) first.classList.add('active');
+});
+</script>
+{% endblock %}

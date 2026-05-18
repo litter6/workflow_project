@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'start_process' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>发起新申请
+    </a>
+</div>
+<div class="card">
+    <div class="card-header">
+        <span><i class="bi bi-send-fill me-2 text-primary"></i>我发起的申请</span>
+    </div>
+    <!-- 搜索过滤栏 -->
+    <div style="padding:14px 20px; border-bottom:1px solid #eef1f7; background:#fafbfd;">
+        <form method="get" class="d-flex gap-2 flex-wrap">
+            <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="搜索申请标题…" style="max-width:220px;">
+            <select name="status" class="form-select form-select-sm" style="max-width:130px;">
+                <option value="">全部状态</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>审批中</option>
+                <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>已通过</option>
+                <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>已驳回</option>
+                <option value="withdrawn" {% if status_filter == 'withdrawn' %}selected{% endif %}>已撤回</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search me-1"></i>搜索</button>
+            {% if q or status_filter %}<a href="{% url 'my_applied' %}" class="btn btn-sm btn-outline-secondary">清除</a>{% endif %}
+        </form>
+    </div>
+    <div class="card-body">
+        {% if instances %}
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>申请标题</th>
+                    <th>流程类型</th>
+                    <th>状态</th>
+                    <th>申请时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for instance in instances %}
+                <tr>
+                    <td><strong>{{ instance.title }}</strong></td>
+                    <td>{{ instance.process.name }}</td>
+                    <td>
+                        {% if instance.status == 'pending' %}<span class="badge bg-warning">审批中</span>
+                        {% elif instance.status == 'approved' %}<span class="badge bg-success">已通过</span>
+                        {% elif instance.status == 'rejected' %}<span class="badge bg-danger">已驳回</span>
+                        {% elif instance.status == 'withdrawn' %}<span class="badge bg-secondary">已撤回</span>{% endif %}
+                    </td>
+                    <td class="text-muted">{{ instance.created_at|date:"Y-m-d H:i" }}</td>
+                    <td><a href="{% url 'instance_detail' instance.id %}" class="btn btn-sm btn-outline-primary">查看</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p>{% if q or status_filter %}未找到匹配的申请{% else %}还没有发起过申请{% endif %}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
