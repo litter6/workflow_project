@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-3 d-flex gap-2">
+    <a href="{% url 'file_manager' instance.id %}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-folder2-open me-1"></i>文件管理
+    </a>
+</div>
+<div class="row g-4">
+    <div class="col-lg-8">
+
+        <!-- 申请信息 -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-file-text me-2"></i>申请信息</div>
+            <div class="card-body" style="padding:20px;">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">流程类型</div>
+                        <div>{{ instance.process.name }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">申请人</div>
+                        <div>{{ instance.applicant }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">申请时间</div>
+                        <div>{{ instance.created_at|date:"Y-m-d H:i" }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">当前状态</div>
+                        <div>
+                            {% if instance.status == 'pending' %}<span class="badge bg-warning">审批中</span>
+                            {% elif instance.status == 'approved' %}<span class="badge bg-success">已通过</span>
+                            {% elif instance.status == 'rejected' %}<span class="badge bg-danger">已驳回</span>
+                            {% elif instance.status == 'withdrawn' %}<span class="badge bg-secondary">已撤回</span>{% endif %}
+                        </div>
+                    </div>
+                    {% if instance.content.customer_name %}
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">客户姓名</div>
+                        <div>{{ instance.content.customer_name }}</div>
+                    </div>
+                    {% endif %}
+                    {% if instance.content.customer_phone %}
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">联系方式</div>
+                        <div>{{ instance.content.customer_phone }}</div>
+                    </div>
+                    {% endif %}
+                    {% if instance.content.house_address %}
+                    <div class="col-12">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">房屋地址</div>
+                        <div>{{ instance.content.house_address }}</div>
+                    </div>
+                    {% endif %}
+                    {% if instance.content.description %}
+                    <div class="col-12">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">申请内容</div>
+                        <div style="background:#f8fafc; border-radius:8px; padding:12px; font-size:14px;">{{ instance.content.description }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 流程进度 -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-map me-2"></i>流程进度</div>
+            <div class="card-body" style="padding:24px;">
+                <div class="d-flex align-items-center">
+                    {% for node in instance.process.nodes.all %}
+                    <div class="text-center" style="min-width:110px;">
+                        {% if node.order < instance.current_step %}
+                            <div class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#d1fae5;color:#065f46;font-size:18px;">✓</div>
+                            <div class="small fw-500 mt-1" style="color:#065f46;">{{ node.name }}</div>
+                            <div class="small text-muted">已完成</div>
+                        {% elif node.order == instance.current_step %}
+                            {% if instance.status == 'approved' %}
+                                <div class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#d1fae5;color:#065f46;font-size:18px;">✓</div>
+                                <div class="small fw-500 mt-1" style="color:#065f46;">{{ node.name }}</div>
+                                <div class="small text-muted">已完成</div>
+                            {% elif instance.status == 'rejected' %}
+                                <div class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#fee2e2;color:#991b1b;font-size:18px;">✗</div>
+                                <div class="small fw-500 mt-1" style="color:#991b1b;">{{ node.name }}</div>
+                                <div class="small text-muted">已驳回</div>
+                            {% else %}
+                                <div class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#dbeafe;color:#1d4ed8;font-size:16px;font-weight:700;">…</div>
+                                <div class="small fw-500 mt-1" style="color:#1d4ed8;">{{ node.name }}</div>
+                                <div class="small text-muted">审批中</div>
+                            {% endif %}
+                        {% else %}
+                            <div class="rounded-circle d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;background:#f1f5f9;color:#94a3b8;font-size:16px;">○</div>
+                            <div class="small mt-1 text-muted">{{ node.name }}</div>
+                            <div class="small text-muted">待审批</div>
+                        {% endif %}
+                    </div>
+                    {% if not forloop.last %}
+                    <div class="flex-grow-1 {% if node.order < instance.current_step %}step-line-done{% else %}step-line-wait{% endif %}"></div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 申请附件 -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-paperclip me-2"></i>申请附件</div>
+            <div class="card-body" style="padding:16px 20px;">
+                {% if initial_attachments %}
+                <div class="d-flex flex-column gap-2">
+                    {% for att in initial_attachments %}
+                    <div class="d-flex justify-content-between align-items-center rounded p-2 px-3" style="background:#f8fafc; border:1px solid #e8edf5;">
+                        <div>
+                            <i class="bi bi-file-earmark me-2 text-muted"></i>
+                            <span style="font-size:13.5px;">{{ att.filename }}</span>
+                            <small class="text-muted ms-2">{{ att.uploaded_by }} · {{ att.uploaded_at|date:"Y-m-d H:i" }}</small>
+                        </div>
+                        <a href="{{ att.file.url }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                            <i class="bi bi-download me-1"></i>下载
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">暂无附件</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 审批历史 -->
+        <div class="card">
+            <div class="card-header"><i class="bi bi-clock-history me-2"></i>审批历史</div>
+            <div class="card-body" style="padding:20px;">
+                {% for item in records_with_attachments %}
+                <div class="d-flex gap-3 mb-4">
+                    <div class="flex-shrink-0">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center {% if item.record.action == 'approve' %}record-approve{% else %}record-reject{% endif %}" style="width:36px;height:36px;">
+                            <i class="bi {% if item.record.action == 'approve' %}bi-check-lg{% else %}bi-x-lg{% endif %}"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <strong style="font-size:14px;">{{ item.record.operator }}</strong>
+                            <span class="badge {% if item.record.action == 'approve' %}bg-success{% else %}bg-danger{% endif %}">{{ item.record.get_action_display }}</span>
+                            <small class="text-muted">{{ item.record.created_at|date:"Y-m-d H:i" }}</small>
+                        </div>
+                        {% if item.record.comment %}
+                        <div style="background:#f8fafc; border-radius:8px; padding:10px 14px; font-size:13.5px; color:#374151; border-left:3px solid #e2e8f0;">
+                            {{ item.record.comment }}
+                        </div>
+                        {% endif %}
+                        {% if item.attachments %}
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            {% for att in item.attachments %}
+                            <a href="{{ att.file.url }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                                <i class="bi bi-paperclip me-1"></i>{{ att.filename }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted small">暂无审批记录</p>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 撤回按钮（仅申请人且审批中可见） -->
+    {% if instance.applicant == request.user and instance.status == 'pending' %}
+    <div class="col-12 mb-2">
+        <form method="post" action="{% url 'withdraw' instance.id %}" onsubmit="return confirm('确认撤回该申请？撤回后流程将终止。')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>撤回申请
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- 审批操作栏 -->
+    {% if instance.status == 'pending' and is_current_approver and not already_handled %}
+    <div class="col-lg-4">
+        <div class="card" style="position:sticky; top:80px;">
+            <div class="card-header"><i class="bi bi-pencil-square me-2 text-primary"></i>审批操作</div>
+            <div class="card-body" style="padding:20px;">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">审批意见</label>
+                        <textarea name="comment" class="form-control" rows="5" placeholder="请输入审批意见（可选）"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label">补充附件</label>
+                        <input type="file" id="detailFileInput" name="attachments" multiple
+                            accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.pdf,.txt,.png,.jpg,.jpeg"
+                            style="display:none">
+                        <div id="detailDropZone" class="rounded p-3 text-center" style="border:2px dashed #c8d8ea; cursor:pointer; transition:all 0.2s; background:#f8fafc;">
+                            <i class="bi bi-cloud-upload" style="font-size:22px; color:#94a3b8;"></i>
+                            <p class="mb-0 mt-1 small" style="color:#64748b;">
+                                拖拽或<span style="color:#2d6cb4; text-decoration:underline;" onclick="document.getElementById('detailFileInput').click()">点击上传</span>
+                            </p>
+                        </div>
+                        <div id="detailFileList" class="mt-2"></div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" name="action" value="approve" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i>同意
+                        </button>
+                        <button type="submit" name="action" value="reject" class="btn btn-danger">
+                            <i class="bi bi-x-lg me-1"></i>驳回
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<style>
+#detailDropZone.drag-over { background:#eff6ff !important; border-color:#2d6cb4 !important; }
+.step-line-done { height:2px; background:#a7f3d0; }
+.step-line-wait { height:2px; background:#e2e8f0; }
+.record-approve { background:#d1fae5; color:#059669; }
+.record-reject  { background:#fee2e2; color:#dc2626; }
+</style>
+<script>
+let detailSelectedFiles = [];
+const detailDropZone = document.getElementById('detailDropZone');
+const detailInput = document.getElementById('detailFileInput');
+
+if (detailDropZone) {
+    detailDropZone.addEventListener('dragover', e => { e.preventDefault(); detailDropZone.classList.add('drag-over'); });
+    detailDropZone.addEventListener('dragleave', () => detailDropZone.classList.remove('drag-over'));
+    detailDropZone.addEventListener('drop', e => { e.preventDefault(); detailDropZone.classList.remove('drag-over'); addDetailFiles(e.dataTransfer.files); });
+    detailDropZone.addEventListener('click', () => detailInput.click());
+}
+if (detailInput) {
+    detailInput.addEventListener('change', function(e) { addDetailFiles(e.target.files); e.target.value = ''; });
+}
+function addDetailFiles(files) {
+    for (let file of files) {
+        if (file.size > 50 * 1024 * 1024) { alert(`"${file.name}" 超过50MB`); continue; }
+        if (!detailSelectedFiles.some(f => f.name === file.name && f.size === file.size)) detailSelectedFiles.push(file);
+    }
+    updateDetailInput(); renderDetailFileList();
+}
+function updateDetailInput() {
+    const dt = new DataTransfer();
+    detailSelectedFiles.forEach(f => dt.items.add(f));
+    if (detailInput) detailInput.files = dt.files;
+}
+function renderDetailFileList() {
+    const list = document.getElementById('detailFileList');
+    if (!list) return;
+    list.innerHTML = '';
+    detailSelectedFiles.forEach((file, i) => {
+        const size = (file.size / 1024 / 1024).toFixed(2);
+        const item = document.createElement('div');
+        item.className = 'd-flex justify-content-between align-items-center rounded p-2 mb-1';
+        item.style = 'background:#f8fafc; border:1px solid #e8edf5; font-size:13px;';
+        item.innerHTML = `<div><i class="bi bi-paperclip me-1 text-muted"></i>${file.name} <small class="text-muted">${size}MB</small></div>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeDetailFile(${i})">删除</button>`;
+        list.appendChild(item);
+    });
+}
+function removeDetailFile(index) {
+    detailSelectedFiles.splice(index, 1);
+    updateDetailInput(); renderDetailFileList();
+}
+</script>
+{% endblock %}

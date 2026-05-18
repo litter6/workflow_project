@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# 虚拟环境
+venv/
+venv311/
+env/
+.venv/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+media/
+
+# 环境变量（敏感信息，不上传）
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# 编译产物
+dist/
+build/
+*.egg-info/
+
+# 系统文件
+.DS_Store
+Thumbs.db

@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+.stat-card { background:white; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,0.07); padding:20px 24px; }
+.stat-number { font-size:28px; font-weight:700; color:#1a202c; line-height:1.2; }
+.stat-label  { font-size:12px; color:#94a3b8; margin-top:4px; }
+.section-title { font-size:15px; font-weight:600; color:#1a202c; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.bar-wrap { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.bar-label { min-width:80px; font-size:13px; color:#374151; text-align:right; }
+.bar-track { flex:1; background:#f1f5f9; border-radius:6px; height:20px; overflow:hidden; }
+.bar-fill  { height:100%; border-radius:6px; transition:width 0.4s; }
+.bar-value { min-width:60px; font-size:13px; color:#64748b; }
+</style>
+
+<!-- 概览数字 -->
+<div class="row g-3 mb-4">
+    {% for row in project_by_status %}
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-number">{{ row.count }}</div>
+            <div class="stat-label">{{ row.label }}项目</div>
+        </div>
+    </div>
+    {% endfor %}
+    {% for row in quotation_by_status %}
+    {% if row.status == 'approved' %}
+    <div class="col-6 col-md-3">
+        <div class="stat-card">
+            <div class="stat-number" style="color:#059669;">¥{{ row.total|floatformat:0 }}</div>
+            <div class="stat-label">已审批报价总额</div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<div class="row g-4">
+
+    <!-- ① 项目统计 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="bi bi-folder2-open me-2 text-warning"></i>项目统计</span>
+            </div>
+            <div class="card-body" style="padding:20px;">
+                <div class="section-title" style="font-size:13px; color:#64748b; font-weight:500; margin-bottom:12px;">
+                    各状态分布
+                </div>
+                {% with total_proj=project_by_status|length %}
+                {% for row in project_by_status %}
+                {% with pct=row.count %}
+                <div class="bar-wrap">
+                    <div class="bar-label">{{ row.label }}</div>
+                    <div class="bar-track">
+                        <div class="bar-fill"
+                             style="width:{% if row.count %}{{ row.count|add:'0' }}{% else %}0{% endif %}%;
+                                    background:{% if row.status == 'active' %}#3b82f6{% elif row.status == 'completed' %}#10b981{% else %}#94a3b8{% endif %};"
+                             data-count="{{ row.count }}" data-key="proj"></div>
+                    </div>
+                    <div class="bar-value">{{ row.count }} 个</div>
+                </div>
+                {% endwith %}
+                {% endfor %}
+                {% endwith %}
+
+                <div class="section-title mt-4" style="font-size:13px; color:#64748b; font-weight:500; margin-bottom:12px;">
+                    近半年新建趋势
+                </div>
+                <canvas id="projChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ② 报价统计 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="bi bi-receipt me-2 text-primary"></i>报价统计</span>
+            </div>
+            <div class="card-body" style="padding:20px;">
+                <div class="section-title" style="font-size:13px; color:#64748b; font-weight:500; margin-bottom:12px;">
+                    各状态分布
+                </div>
+                {% with total_q=quotation_by_status|length %}
+                {% for row in quotation_by_status %}
+                <div class="bar-wrap">
+                    <div class="bar-label">{{ row.label }}</div>
+                    <div class="bar-track">
+                        <div class="bar-fill"
+                             style="background:{% if row.status == 'approved' %}#10b981{% elif row.status == 'submitted' %}#f59e0b{% elif row.status == 'rejected' %}#ef4444{% else %}#94a3b8{% endif %};"
+                             data-count="{{ row.count }}" data-key="quot"></div>
+                    </div>
+                    <div class="bar-value">{{ row.count }} 张 &nbsp;¥{{ row.total|floatformat:0 }}</div>
+                </div>
+                {% endfor %}
+                {% endwith %}
+
+                {% if designer_stats %}
+                <div class="section-title mt-4" style="font-size:13px; color:#64748b; font-weight:500; margin-bottom:12px;">
+                    设计师业绩（已审批）
+                </div>
+                <table class="table table-sm" style="font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th>设计师</th>
+                            <th>报价数</th>
+                            <th>成交金额</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in designer_stats %}
+                        <tr>
+                            <td>{{ row.name }}</td>
+                            <td>{{ row.count }}</td>
+                            <td style="font-weight:600; color:#059669;">¥{{ row.total|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color:#94a3b8; font-size:13px; margin-top:16px;">暂无已审批的报价单</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ③ 价格表使用分析 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="bi bi-tags me-2 text-info"></i>价格表使用分析</span>
+            </div>
+            <div class="card-body" style="padding:20px;">
+                {% if hot_items %}
+                <table class="table table-hover" style="font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>项目名称</th>
+                            <th>分类</th>
+                            <th>引用次数</th>
+                            <th>合计数量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in hot_items %}
+                        <tr>
+                            <td style="color:#94a3b8;">{{ forloop.counter }}</td>
+                            <td style="font-weight:500;">{{ row.price_item__name }}</td>
+                            <td><span class="badge bg-primary">{{ row.cat_label }}</span></td>
+                            <td>{{ row.usage_count }} 次</td>
+                            <td style="color:#64748b;">{{ row.total_qty|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state" style="padding:32px 20px;">
+                    <i class="bi bi-tags" style="font-size:32px; color:#cbd5e1;"></i>
+                    <p style="color:#94a3b8; margin-top:8px;">暂无引用数据</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ④ 报价明细分类汇总 -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <span><i class="bi bi-pie-chart me-2 text-success"></i>报价明细分类汇总（已审批）</span>
+            </div>
+            <div class="card-body" style="padding:20px;">
+                {% if category_summary %}
+                <canvas id="catChart" height="200"></canvas>
+                <table class="table table-sm mt-3" style="font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th>分类</th>
+                            <th>行数</th>
+                            <th>金额</th>
+                            <th>占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in category_summary %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td style="color:#64748b;">{{ row.item_count }}</td>
+                            <td style="font-weight:600;">¥{{ row.subtotal|floatformat:2 }}</td>
+                            <td style="color:#64748b;">
+                                {% if category_total %}
+                                {{ row.subtotal|floatformat:2 }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight:600; background:#f8fafc;">
+                            <td>合计</td>
+                            <td></td>
+                            <td style="color:#059669;">¥{{ category_total|floatformat:2 }}</td>
+                            <td>100%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <div class="empty-state" style="padding:32px 20px;">
+                    <i class="bi bi-pie-chart" style="font-size:32px; color:#cbd5e1;"></i>
+                    <p style="color:#94a3b8; margin-top:8px;">暂无已审批的报价明细</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// 动态计算横向进度条宽度（相对最大值）
+(function() {
+    ['proj', 'quot'].forEach(key => {
+        const bars = document.querySelectorAll(`[data-key="${key}"]`);
+        const max = Math.max(...[...bars].map(b => parseInt(b.dataset.count) || 0));
+        bars.forEach(b => {
+            b.style.width = max > 0 ? ((parseInt(b.dataset.count) / max) * 100) + '%' : '0%';
+        });
+    });
+})();
+
+// 近半年项目趋势折线图
+const projData = {{ projects_monthly|safe }};
+if (projData.length > 0) {
+    new Chart(document.getElementById('projChart'), {
+        type: 'line',
+        data: {
+            labels: projData.map(d => d.month),
+            datasets: [{
+                label: '新建项目数',
+                data: projData.map(d => d.count),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59,130,246,0.08)',
+                borderWidth: 2,
+                pointRadius: 4,
+                tension: 0.3,
+                fill: true,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+                x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+            }
+        }
+    });
+}
+
+// 分类金额饼图
+{% if category_summary %}
+const catLabels = [{% for r in category_summary %}"{{ r.label }}",{% endfor %}];
+const catValues = [{% for r in category_summary %}{{ r.subtotal }},{% endfor %}];
+const palette = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899'];
+new Chart(document.getElementById('catChart'), {
+    type: 'doughnut',
+    data: {
+        labels: catLabels,
+        datasets: [{ data: catValues, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+        plugins: {
+            legend: { position: 'right', labels: { font: { size: 12 }, padding: 12 } },
+            tooltip: {
+                callbacks: {
+                    label: ctx => ` ¥${parseFloat(ctx.raw).toLocaleString('zh-CN', {minimumFractionDigits:2})}`
+                }
+            }
+        },
+        cutout: '60%'
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

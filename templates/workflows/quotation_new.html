@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'project_detail' project.id %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>返回项目
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+
+        <!-- 项目信息 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-folder2-open me-2 text-warning"></i>关联项目
+            </div>
+            <div class="card-body" style="padding:16px 20px; font-size:13.5px;">
+                <div class="row g-2">
+                    <div class="col-sm-6">
+                        <span style="color:#94a3b8;">项目名称：</span>
+                        <strong>{{ project.name }}</strong>
+                    </div>
+                    <div class="col-sm-6">
+                        <span style="color:#94a3b8;">状态：</span>
+                        {% if project.status == 'active' %}<span class="badge bg-primary">进行中</span>
+                        {% elif project.status == 'completed' %}<span class="badge bg-success">已完成</span>
+                        {% elif project.status == 'archived' %}<span class="badge bg-secondary">已归档</span>{% endif %}
+                    </div>
+                    {% with ai=project.approval_instance %}
+                    {% if ai.content.customer_name %}
+                    <div class="col-sm-6">
+                        <span style="color:#94a3b8;">客户姓名：</span>{{ ai.content.customer_name }}
+                    </div>
+                    {% endif %}
+                    {% if ai.content.house_address %}
+                    <div class="col-sm-6">
+                        <span style="color:#94a3b8;">房屋地址：</span>{{ ai.content.house_address }}
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 新建表单 -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-plus-circle me-2 text-primary"></i>新建报价单
+            </div>
+            <div class="card-body" style="padding:24px;">
+                <form method="post" action="{% url 'quotation_create' project.id %}">
+                    {% csrf_token %}
+
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label">施工工期</label>
+                            <div class="input-group">
+                                <input type="text" name="construction_period" class="form-control"
+                                       placeholder="如：90" style="max-width:120px;">
+                                <span class="input-group-text">天</span>
+                            </div>
+                            <div class="form-text" style="font-size:11px;">可留空，后续修改</div>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">质保期限</label>
+                            <div class="input-group">
+                                <input type="text" name="warranty_period" class="form-control"
+                                       placeholder="如：2" style="max-width:120px;">
+                                <span class="input-group-text">年</span>
+                            </div>
+                            <div class="form-text" style="font-size:11px;">可留空，后续修改</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">备注说明</label>
+                            <textarea name="notes" class="form-control" rows="3"
+                                      placeholder="填写报价说明、特殊条款等（选填）"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{% url 'project_detail' project.id %}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i>创建报价单
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

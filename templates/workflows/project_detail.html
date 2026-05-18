@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-3 d-flex gap-2">
+    <a href="{% url 'project_list' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>项目列表
+    </a>
+    {% if can_create_quotation %}
+    <a href="{% url 'quotation_create' project.id %}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>新建报价单
+    </a>
+    {% endif %}
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <!-- 项目信息 -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-folder2-open me-2 text-warning"></i>项目信息</div>
+            <div class="card-body" style="padding:16px 20px; font-size:13.5px;">
+                <div class="mb-2">
+                    <span style="color:#94a3b8;">项目名称：</span>
+                    <strong>{{ project.name }}</strong>
+                </div>
+                <div class="mb-2">
+                    <span style="color:#94a3b8;">状态：</span>
+                    {% if project.status == 'active' %}<span class="badge bg-primary">进行中</span>
+                    {% elif project.status == 'completed' %}<span class="badge bg-success">已完成</span>
+                    {% elif project.status == 'archived' %}<span class="badge bg-secondary">已归档</span>{% endif %}
+                </div>
+                <div class="mb-2">
+                    <span style="color:#94a3b8;">创建人：</span>{{ project.created_by }}
+                </div>
+                <div class="mb-2">
+                    <span style="color:#94a3b8;">创建时间：</span>{{ project.created_at|date:"Y-m-d" }}
+                </div>
+                {% with ai=project.approval_instance %}
+                {% if ai.content.customer_name %}
+                <div class="mb-2"><span style="color:#94a3b8;">客户姓名：</span>{{ ai.content.customer_name }}</div>
+                {% endif %}
+                {% if ai.content.customer_phone %}
+                <div class="mb-2"><span style="color:#94a3b8;">联系方式：</span>{{ ai.content.customer_phone }}</div>
+                {% endif %}
+                {% if ai.content.house_address %}
+                <div class="mb-2"><span style="color:#94a3b8;">房屋地址：</span>{{ ai.content.house_address }}</div>
+                {% endif %}
+                {% endwith %}
+                <div class="mt-3">
+                    <a href="{% url 'instance_detail' project.approval_instance.id %}" class="btn btn-sm btn-outline-secondary w-100">
+                        <i class="bi bi-file-text me-1"></i>查看审批详情
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <!-- 报价单列表 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <span><i class="bi bi-receipt me-2"></i>报价单</span>
+                {% if can_create_quotation %}
+                <a href="{% url 'quotation_create' project.id %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>新建报价单
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if quotations %}
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>报价单号</th>
+                            <th>创建人</th>
+                            <th>总金额</th>
+                            <th>折扣</th>
+                            <th>成交金额</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for q in quotations %}
+                        <tr>
+                            <td><a href="{% url 'quotation_detail' q.id %}" style="color:#2d6cb4; font-weight:500;">{{ q.quote_no }}</a></td>
+                            <td>{{ q.designer }}</td>
+                            <td>¥{{ q.total_amount }}</td>
+                            <td>{{ q.discount }}%</td>
+                            <td style="font-weight:600; color:#1a202c;">¥{{ q.final_amount }}</td>
+                            <td>
+                                {% if q.status == 'draft' %}<span class="badge bg-secondary">草稿</span>
+                                {% elif q.status == 'submitted' %}<span class="badge bg-warning">已提交</span>
+                                {% elif q.status == 'approved' %}<span class="badge bg-success">已审批</span>
+                                {% elif q.status == 'rejected' %}<span class="badge bg-danger">已驳回</span>{% endif %}
+                            </td>
+                            <td style="color:#94a3b8;">{{ q.created_at|date:"Y-m-d" }}</td>
+                            <td>
+                                <a href="{% url 'quotation_detail' q.id %}" class="btn btn-sm btn-outline-primary">查看</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-receipt" style="font-size:36px; color:#cbd5e1;"></i>
+                    <p style="color:#94a3b8; margin-top:10px;">
+                        {% if can_create_quotation %}暂无报价单，点击"新建报价单"开始报价{% else %}暂无报价单{% endif %}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 归档文件 -->
+        <div class="card">
+            <div class="card-header"><i class="bi bi-archive me-2"></i>归档文件</div>
+            <div class="card-body">
+                {% if documents %}
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>文件名</th>
+                            <th>类型</th>
+                            <th>版本</th>
+                            <th>上传人</th>
+                            <th>上传时间</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doc in documents %}
+                        <tr>
+                            <td><i class="bi bi-paperclip me-1 text-muted"></i>{{ doc.name }}</td>
+                            <td>{{ doc.get_doc_type_display }}</td>
+                            <td>v{{ doc.version }}</td>
+                            <td>{{ doc.uploaded_by }}</td>
+                            <td style="color:#94a3b8;">{{ doc.uploaded_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <a href="/media/{{ doc.file }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                    <i class="bi bi-download me-1"></i>下载
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state" style="padding:32px 20px;">
+                    <i class="bi bi-folder" style="font-size:32px; color:#cbd5e1;"></i>
+                    <p style="color:#94a3b8; margin-top:8px;">暂无归档文件</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

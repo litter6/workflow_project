@@ -1,0 +1,540 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- 操作栏 -->
+<div class="mb-3 d-flex gap-2 align-items-center flex-wrap no-print">
+    <a href="{% url 'quotation_list' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>报价列表
+    </a>
+    <a href="{% url 'project_detail' quotation.project.id %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-folder2 me-1"></i>{{ quotation.project.name }}
+    </a>
+    {% if quotation.status == 'draft' %}<span class="badge bg-secondary">草稿</span>
+    {% elif quotation.status == 'submitted' %}<span class="badge bg-warning">已提交</span>
+    {% elif quotation.status == 'approved' %}<span class="badge bg-success">已审批</span>
+    {% elif quotation.status == 'rejected' %}<span class="badge bg-danger">已驳回</span>{% endif %}
+
+    {% if can_edit %}
+    <button type="submit" form="quoteForm" name="action" value="save" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-save me-1"></i>保存草稿
+    </button>
+    <button type="submit" form="quoteForm" name="action" value="submit" class="btn btn-sm btn-primary"
+            onclick="return confirmSubmit()">
+        <i class="bi bi-send me-1"></i>提交报价
+    </button>
+    {% endif %}
+
+    {% if can_do_approve %}
+    <form method="post" class="d-inline">{% csrf_token %}
+        <input type="hidden" name="action" value="approve">
+        <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-circle me-1"></i>审批通过</button>
+    </form>
+    <button type="button" class="btn btn-sm btn-danger" onclick="openRejectModal()">
+        <i class="bi bi-x-circle me-1"></i>驳回
+    </button>
+    {% endif %}
+
+    {% if can_do_reset %}
+    <form method="post" class="d-inline" onsubmit="return confirm('确认退回草稿？')">{% csrf_token %}
+        <input type="hidden" name="action" value="reset">
+        <button type="submit" class="btn btn-sm btn-outline-warning"><i class="bi bi-arrow-counterclockwise me-1"></i>退回草稿</button>
+    </form>
+    {% endif %}
+
+    <button type="button" onclick="window.print()" class="btn btn-sm btn-outline-secondary ms-auto no-print">
+        <i class="bi bi-printer me-1"></i>打印
+    </button>
+</div>
+
+<!-- 打印标题 -->
+<div class="print-only" style="display:none; text-align:center; margin-bottom:24px;">
+    <h2 style="font-size:22px; font-weight:700; margin:0;">装修设计报价单</h2>
+    <p style="color:#64748b; margin:6px 0 0;">{{ quotation.quote_no }} &nbsp;·&nbsp; {{ quotation.created_at|date:"Y年m月d日" }}</p>
+</div>
+
+<form id="quoteForm" method="post" onsubmit="serializeItems()">
+{% csrf_token %}
+<input type="hidden" name="items_json" id="items_json">
+
+<div class="row g-4">
+    <!-- 左侧主内容 -->
+    <div class="col-lg-8">
+
+        <!-- 基本信息 -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>基本信息</div>
+            <div class="card-body" style="padding:20px;">
+                <div class="row g-3" style="font-size:13.5px;">
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">报价单号</div>
+                        <div style="font-weight:600; color:#1a202c;">{{ quotation.quote_no }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">关联项目</div>
+                        <div>{{ quotation.project.name }}</div>
+                    </div>
+                    {% with ai=quotation.project.approval_instance %}
+                    {% if ai.content.customer_name %}
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">客户姓名</div>
+                        <div>{{ ai.content.customer_name }}</div>
+                    </div>
+                    {% endif %}
+                    {% if ai.content.customer_phone %}
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">联系方式</div>
+                        <div>{{ ai.content.customer_phone }}</div>
+                    </div>
+                    {% endif %}
+                    {% if ai.content.house_address %}
+                    <div class="col-12">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">房屋地址</div>
+                        <div>{{ ai.content.house_address }}</div>
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">设计师</div>
+                        <div>{{ quotation.designer }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">报价日期</div>
+                        <div>{{ quotation.created_at|date:"Y-m-d" }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">施工周期</div>
+                        {% if can_edit %}
+                        <div class="input-group input-group-sm" style="max-width:160px;">
+                            <input type="number" name="construction_period" class="form-control"
+                                   value="{{ quotation.construction_period|default:'' }}" min="1" placeholder="天数">
+                            <span class="input-group-text">天</span>
+                        </div>
+                        {% else %}
+                        <div>{% if quotation.construction_period %}{{ quotation.construction_period }} 天{% else %}—{% endif %}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-sm-6">
+                        <div style="color:#94a3b8; font-size:12px; margin-bottom:3px;">质保期</div>
+                        {% if can_edit %}
+                        <div class="input-group input-group-sm" style="max-width:160px;">
+                            <input type="number" name="warranty_period" class="form-control"
+                                   value="{{ quotation.warranty_period|default:'' }}" min="1" placeholder="年数">
+                            <span class="input-group-text">年</span>
+                        </div>
+                        {% else %}
+                        <div>{% if quotation.warranty_period %}{{ quotation.warranty_period }} 年{% else %}—{% endif %}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if quotation.status == 'rejected' and quotation.reject_reason %}
+                <div style="margin-top:16px; background:#fef2f2; border-radius:8px; padding:12px 16px;">
+                    <div style="color:#991b1b; font-size:12px; font-weight:600; margin-bottom:4px;">
+                        <i class="bi bi-x-circle me-1"></i>驳回原因
+                    </div>
+                    <div style="color:#7f1d1d; font-size:13.5px;">{{ quotation.reject_reason }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 报价明细 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <span><i class="bi bi-list-ul me-2"></i>报价明细</span>
+                {% if can_edit %}
+                <button type="button" onclick="addRow()" class="btn btn-sm btn-outline-primary no-print">
+                    <i class="bi bi-plus-lg me-1"></i>添加项目
+                </button>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if can_edit %}
+                <!-- 编辑模式：动态表格（从价格表选择） -->
+                <div style="overflow-x:auto;">
+                    <table class="table table-sm" id="itemsTable" style="min-width:900px;">
+                        <thead>
+                            <tr>
+                                <th style="min-width:170px;">从价格表选择</th>
+                                <th style="min-width:130px;">项目名称</th>
+                                <th style="min-width:100px;">规格说明</th>
+                                <th style="min-width:58px;">单位</th>
+                                <th style="min-width:80px;">数量</th>
+                                <th style="min-width:160px;">单价(元)</th>
+                                <th style="min-width:90px;">小计(元)</th>
+                                <th style="min-width:100px;">备注</th>
+                                <th style="width:44px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody"></tbody>
+                    </table>
+                </div>
+                <div id="emptyHint" class="empty-state" style="padding:32px 20px;">
+                    <i class="bi bi-table" style="font-size:32px; color:#cbd5e1;"></i>
+                    <p style="color:#94a3b8; margin-top:8px;">点击"添加项目"从价格表中选择报价项目</p>
+                </div>
+                {% else %}
+                <!-- 查看模式：分类分组 -->
+                {% if items_grouped %}
+                {% for group in items_grouped %}
+                <div class="mb-1">
+                    <div style="font-weight:600; padding:7px 16px; background:#f8fafc; border-left:3px solid #2d6cb4; color:#1a202c; font-size:13px;">
+                        {{ group.label }}
+                    </div>
+                    <table class="table table-sm" style="margin-bottom:0;">
+                        <thead>
+                            <tr>
+                                <th>项目名称</th><th>规格说明</th><th>单位</th>
+                                <th>数量</th><th>单价(元)</th><th>小计(元)</th><th>备注</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in group.items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td style="color:#64748b;">{{ item.spec|default:"—" }}</td>
+                                <td>{{ item.unit }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.unit_price }}</td>
+                                <td style="font-weight:500;">{{ item.total_price }}</td>
+                                <td style="color:#64748b;">{{ item.notes|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#f8fafc;">
+                                <td colspan="5" style="text-align:right; font-weight:600; color:#64748b; padding:8px 16px;">小计：</td>
+                                <td style="font-weight:700; color:#1a202c; padding:8px 16px;">¥{{ group.subtotal }}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state" style="padding:32px 20px;">
+                    <i class="bi bi-table" style="font-size:32px; color:#cbd5e1;"></i>
+                    <p style="color:#94a3b8; margin-top:8px;">暂无报价项目</p>
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 备注说明 -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-chat-text me-2"></i>备注说明</div>
+            <div class="card-body" style="padding:16px 20px;">
+                {% if can_edit %}
+                <textarea name="notes" class="form-control" rows="4"
+                          placeholder="施工工艺要求、付款方式、特别约定等">{{ quotation.notes }}</textarea>
+                {% else %}
+                {% if quotation.notes %}
+                <div style="background:#f8fafc; border-radius:8px; padding:12px 16px; font-size:13.5px; color:#374151; white-space:pre-wrap;">{{ quotation.notes }}</div>
+                {% else %}
+                <p class="text-muted small mb-0">（无）</p>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧汇总 -->
+    <div class="col-lg-4 no-print">
+        <div style="position:sticky; top:80px;">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-calculator me-2"></i>报价汇总</div>
+                <div class="card-body" style="padding:20px;">
+                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2" style="border-bottom:1px solid #f1f5f9;">
+                        <span style="color:#64748b; font-size:13.5px;">明细合计</span>
+                        <span id="totalDisplay" style="font-size:16px; font-weight:600; color:#1a202c;">¥{{ quotation.total_amount }}</span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;">折扣（%）</label>
+                        {% if can_edit %}
+                        <div class="input-group input-group-sm">
+                            <input type="number" id="discountInput" name="discount" class="form-control"
+                                   value="{{ quotation.discount }}" min="1" max="100" step="0.1">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <div class="form-text" style="font-size:11px;">100% = 不打折，90% = 九折</div>
+                        {% else %}
+                        <div style="font-size:14px; font-weight:500;">{{ quotation.discount }}%</div>
+                        {% endif %}
+                    </div>
+                    <div style="background:#eff6ff; border-radius:10px; padding:16px; text-align:center;">
+                        <div style="color:#64748b; font-size:12px; margin-bottom:4px;">成交金额</div>
+                        <div id="finalDisplay" style="font-size:22px; font-weight:700; color:#1d4ed8;">¥{{ quotation.final_amount }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 打印专用汇总 -->
+    <div class="col-12 print-only" style="display:none; margin-top:16px;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <tr>
+                <td style="padding:6px 12px; border:1px solid #e2e8f0; background:#f8fafc; font-weight:600;">明细合计</td>
+                <td style="padding:6px 12px; border:1px solid #e2e8f0; text-align:right;">¥{{ quotation.total_amount }}</td>
+                <td style="padding:6px 12px; border:1px solid #e2e8f0; background:#f8fafc; font-weight:600;">折扣</td>
+                <td style="padding:6px 12px; border:1px solid #e2e8f0; text-align:right;">{{ quotation.discount }}%</td>
+                <td style="padding:6px 12px; border:1px solid #e2e8f0; background:#1d4ed8; color:white; font-weight:700;">成交金额</td>
+                <td style="padding:6px 12px; border:1px solid #e2e8f0; text-align:right; font-weight:700; color:#1d4ed8; font-size:15px;">¥{{ quotation.final_amount }}</td>
+            </tr>
+        </table>
+        <div style="margin-top:48px; display:flex; justify-content:space-between;">
+            <div style="text-align:center; min-width:180px;"><div style="border-top:1px solid #374151; padding-top:6px; font-size:12px; color:#64748b;">设计师签字</div></div>
+            <div style="text-align:center; min-width:180px;"><div style="border-top:1px solid #374151; padding-top:6px; font-size:12px; color:#64748b;">客户签字</div></div>
+            <div style="text-align:center; min-width:180px;"><div style="border-top:1px solid #374151; padding-top:6px; font-size:12px; color:#64748b;">日期</div></div>
+        </div>
+    </div>
+</div>
+</form>
+
+{% if can_edit %}
+{{ items_list|json_script:"items-data" }}
+{{ cat_choices|json_script:"cat-data" }}
+{{ price_items_data|json_script:"price-items-data" }}
+{% endif %}
+
+<style>
+.table thead th { white-space: nowrap; }
+.price-range-hint { font-size:11px; color:#059669; margin-top:2px; line-height:1.3; }
+.price-range-hint.over { color:#dc2626; }
+@media print {
+    .sidebar, .topbar, .no-print { display: none !important; }
+    .main-wrap { margin-left:0 !important; margin-top:0 !important; padding:20px !important; }
+    .print-only { display:block !important; }
+    .card { box-shadow:none !important; border:1px solid #e2e8f0 !important; }
+    .card-header { background:#f8fafc !important; }
+    a { color:inherit !important; text-decoration:none !important; }
+}
+</style>
+
+{% if can_edit %}
+<script>
+const CATEGORIES   = JSON.parse(document.getElementById('cat-data').textContent);
+const PRICE_ITEMS  = JSON.parse(document.getElementById('price-items-data').textContent);
+let   items        = JSON.parse(document.getElementById('items-data').textContent);
+
+// 补充缺失字段（兼容旧数据）
+items = items.map(item => ({
+    price_item_id: item.price_item_id || null,
+    category:      item.category      || 'other',
+    name:          item.name          || '',
+    spec:          item.spec          || '',
+    unit:          item.unit          || '项',
+    quantity:      item.quantity      || '1',
+    unit_price:    item.unit_price    || '0',
+    total_price:   item.total_price   || '0',
+    notes:         item.notes         || '',
+    min_price:     item.min_price     || '',
+    max_price:     item.max_price     || '',
+}));
+
+// 按分类分组构建价格表选项
+const PI_BY_CAT = {};
+PRICE_ITEMS.forEach(pi => {
+    if (!PI_BY_CAT[pi.category]) PI_BY_CAT[pi.category] = [];
+    PI_BY_CAT[pi.category].push(pi);
+});
+
+function buildPiOptions(selectedId) {
+    let html = '<option value="">-- 请选择价格项目 --</option>';
+    const catOrder = CATEGORIES.map(([v]) => v);
+    catOrder.forEach(cat => {
+        const list = PI_BY_CAT[cat];
+        if (!list) return;
+        const label = CATEGORIES.find(([v]) => v === cat)?.[1] || cat;
+        html += `<optgroup label="${label}">`;
+        list.forEach(pi => {
+            const sel = pi.id === selectedId ? ' selected' : '';
+            const range = parseFloat(pi.fluctuation) === 0
+                ? `¥${pi.base_price}`
+                : `¥${pi.min_price}~¥${pi.max_price}`;
+            html += `<option value="${pi.id}"${sel}>${pi.name}（${pi.unit}，${range}）</option>`;
+        });
+        html += '</optgroup>';
+    });
+    return html;
+}
+
+function fmtMoney(val) {
+    const n = parseFloat(val) || 0;
+    return '¥' + n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+function renderTable() {
+    const tbody = document.getElementById('itemsBody');
+    const hint  = document.getElementById('emptyHint');
+    tbody.innerHTML = '';
+    if (items.length === 0) { hint.style.display = ''; return; }
+    hint.style.display = 'none';
+
+    items.forEach((item, idx) => {
+        const pi = item.price_item_id ? PRICE_ITEMS.find(p => p.id === item.price_item_id) : null;
+        const isFixed   = pi && parseFloat(pi.fluctuation) === 0;
+        const rangeText = pi
+            ? (isFixed ? `固定 ¥${pi.base_price}` : `¥${pi.min_price} ~ ¥${pi.max_price}`)
+            : '';
+        const priceVal = item.unit_price;
+        let   rangeClass = 'price-range-hint';
+        if (pi && item.min_price && item.max_price) {
+            const p = parseFloat(priceVal), mn = parseFloat(item.min_price), mx = parseFloat(item.max_price);
+            if (p < mn || p > mx) rangeClass += ' over';
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+<td>
+  <select class="form-select form-select-sm" onchange="selectPriceItem(${idx},this.value)" style="font-size:12px;">
+    ${buildPiOptions(item.price_item_id)}
+  </select>
+</td>
+<td><input class="form-control form-control-sm" value="${esc(item.name)}" onchange="updateItem(${idx},'name',this.value)" placeholder="名称"></td>
+<td><input class="form-control form-control-sm" value="${esc(item.spec)}" onchange="updateItem(${idx},'spec',this.value)" placeholder="规格"></td>
+<td><input class="form-control form-control-sm" value="${esc(item.unit)}" onchange="updateItem(${idx},'unit',this.value)" style="width:52px;"></td>
+<td><input type="number" class="form-control form-control-sm" value="${esc(item.quantity)}" min="0" step="0.01"
+     oninput="updateItem(${idx},'quantity',this.value);calcRow(${idx})" style="width:72px;"></td>
+<td>
+  <input type="number" class="form-control form-control-sm" id="price-${idx}" value="${esc(priceVal)}" min="0" step="0.01"
+     ${pi ? `min="${pi.min_price}" max="${pi.max_price}"` : ''}
+     ${isFixed ? 'readonly style="background:#f8fafc;width:92px;"' : 'style="width:92px;"'}
+     oninput="updateItem(${idx},'unit_price',this.value);calcRow(${idx})">
+  <div class="${rangeClass}" id="range-${idx}">${rangeText}</div>
+</td>
+<td id="sub-${idx}" style="font-weight:500; white-space:nowrap;">${fmtMoney(item.total_price)}</td>
+<td><input class="form-control form-control-sm" value="${esc(item.notes)}" onchange="updateItem(${idx},'notes',this.value)" placeholder="备注"></td>
+<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteRow(${idx})"><i class="bi bi-trash3"></i></button></td>`;
+        tbody.appendChild(tr);
+    });
+    updateSummary();
+}
+
+function addRow() {
+    items.push({ price_item_id:null, category:'other', name:'', spec:'', unit:'项',
+                 quantity:'1', unit_price:'0', total_price:'0', notes:'', min_price:'', max_price:'' });
+    renderTable();
+    document.getElementById('itemsBody').lastElementChild?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function deleteRow(idx) { items.splice(idx, 1); renderTable(); }
+
+function updateItem(idx, field, value) { items[idx][field] = value; }
+
+function selectPriceItem(idx, piId) {
+    const id = piId ? parseInt(piId) : null;
+    const pi = id ? PRICE_ITEMS.find(p => p.id === id) : null;
+    if (pi) {
+        items[idx].price_item_id = pi.id;
+        items[idx].category  = pi.category;
+        items[idx].name      = pi.name;
+        items[idx].spec      = pi.spec;
+        items[idx].unit      = pi.unit;
+        items[idx].unit_price = pi.base_price;
+        items[idx].min_price  = pi.min_price;
+        items[idx].max_price  = pi.max_price;
+    } else {
+        items[idx].price_item_id = null;
+        items[idx].min_price = '';
+        items[idx].max_price = '';
+    }
+    calcRow(idx);
+    renderTable();
+}
+
+function calcRow(idx) {
+    const qty   = parseFloat(items[idx].quantity)   || 0;
+    const price = parseFloat(items[idx].unit_price)  || 0;
+    const sub   = (qty * price).toFixed(2);
+    items[idx].total_price = sub;
+    const el = document.getElementById(`sub-${idx}`);
+    if (el) el.textContent = fmtMoney(sub);
+    // 实时价格范围提示
+    const rangeEl = document.getElementById(`range-${idx}`);
+    if (rangeEl && items[idx].min_price && items[idx].max_price) {
+        const mn = parseFloat(items[idx].min_price), mx = parseFloat(items[idx].max_price);
+        rangeEl.className = 'price-range-hint' + (price < mn || price > mx ? ' over' : '');
+    }
+    updateSummary();
+}
+
+function updateSummary() {
+    const total    = items.reduce((s, i) => s + (parseFloat(i.total_price) || 0), 0);
+    const discount = parseFloat(document.getElementById('discountInput')?.value) || 100;
+    const final    = (total * discount / 100).toFixed(2);
+    const te = document.getElementById('totalDisplay');
+    const fe = document.getElementById('finalDisplay');
+    if (te) te.textContent = fmtMoney(total.toFixed(2));
+    if (fe) fe.textContent = fmtMoney(final);
+}
+
+function serializeItems() {
+    document.getElementById('items_json').value = JSON.stringify(items);
+}
+
+function confirmSubmit() {
+    // 前端校验：每项必须选择价格表项目且价格在区间内
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (!item.price_item_id) {
+            alert(`第 ${i+1} 行"${item.name || '(未填写)'}"未从价格表选择，请先选择对应项目`);
+            return false;
+        }
+        if (item.min_price !== '' && item.max_price !== '') {
+            const p = parseFloat(item.unit_price) || 0;
+            const mn = parseFloat(item.min_price), mx = parseFloat(item.max_price);
+            if (p < mn || p > mx) {
+                alert(`"${item.name}" 单价 ¥${p.toFixed(2)} 超出允许范围 ¥${mn.toFixed(2)} ~ ¥${mx.toFixed(2)}`);
+                return false;
+            }
+        }
+    }
+    serializeItems();
+    return true;
+}
+
+document.getElementById('discountInput')?.addEventListener('input', updateSummary);
+renderTable();
+</script>
+{% endif %}
+
+{% if can_do_approve %}
+<!-- 驳回弹窗 -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:460px;">
+        <div class="modal-content" style="border-radius:14px; border:none; box-shadow:0 8px 40px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="border-bottom:1px solid #eef1f7; padding:18px 24px;">
+                <h5 class="modal-title" style="font-size:15px; font-weight:600;">
+                    <i class="bi bi-x-circle text-danger me-2"></i>驳回报价单
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reject">
+                <div class="modal-body" style="padding:24px;">
+                    <label class="form-label">驳回原因 <span style="color:#94a3b8; font-weight:400;">（选填）</span></label>
+                    <textarea name="reject_reason" class="form-control" rows="4"
+                              placeholder="请填写驳回原因，设计师将收到通知"></textarea>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #eef1f7; padding:14px 24px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-danger btn-sm">确认驳回</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function openRejectModal() {
+    new bootstrap.Modal(document.getElementById('rejectModal')).show();
+}
+</script>
+{% endif %}
+
+{% endblock %}

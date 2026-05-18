@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<!-- 搜索栏 -->
+<div class="card mb-4">
+    <div class="card-body" style="padding:14px 20px;">
+        <form method="get" class="d-flex gap-2 flex-wrap align-items-center">
+            <input type="text" name="q" value="{{ q }}" class="form-control" style="max-width:220px;" placeholder="搜索项目名称/规格">
+            <select name="cat" class="form-select" style="max-width:160px;">
+                <option value="">全部分类</option>
+                {% for v, l in cat_choices %}
+                <option value="{{ v }}" {% if cat_filter == v %}selected{% endif %}>{{ l }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search me-1"></i>搜索</button>
+            {% if q or cat_filter %}<a href="{% url 'price_list' %}" class="btn btn-outline-secondary btn-sm">清除</a>{% endif %}
+            {% if can_manage %}
+            <button type="button" class="btn btn-success btn-sm ms-auto" onclick="openModal()">
+                <i class="bi bi-plus-lg me-1"></i>新建价格项目
+            </button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- 价格表 -->
+{% if grouped %}
+{% for group in grouped %}
+<div class="card mb-4">
+    <div class="card-header">
+        <span><i class="bi bi-tags me-2 text-primary"></i>{{ group.label }}</span>
+        <span class="text-muted" style="font-size:12px; font-weight:400;">{{ group.items|length }} 项</span>
+    </div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>项目名称</th>
+                    <th>规格说明</th>
+                    <th>单位</th>
+                    <th>基准价格</th>
+                    <th>浮动范围</th>
+                    <th>允许区间</th>
+                    <th>状态</th>
+                    {% if can_manage %}<th></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for pi in group.items %}
+                <tr>
+                    <td style="font-weight:500;">{{ pi.name }}</td>
+                    <td style="color:#64748b;">{{ pi.spec|default:"—" }}</td>
+                    <td>{{ pi.unit }}</td>
+                    <td style="font-weight:600; color:#1a202c;">¥{{ pi.base_price }}</td>
+                    <td>
+                        {% if pi.fluctuation == 0 %}
+                        <span class="badge bg-secondary">固定价格</span>
+                        {% else %}
+                        <span class="badge bg-primary">±{{ pi.fluctuation }}%</span>
+                        {% endif %}
+                    </td>
+                    <td style="color:#059669; font-size:13px;">
+                        {% if pi.fluctuation == 0 %}
+                        ¥{{ pi.base_price }}
+                        {% else %}
+                        ¥{{ pi.min_price }} ~ ¥{{ pi.max_price }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if pi.is_active %}<span class="badge bg-success">启用</span>
+                        {% else %}<span class="badge bg-secondary">禁用</span>{% endif %}
+                    </td>
+                    {% if can_manage %}
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1"
+                                onclick="openModal({{ pi.id }})">编辑</button>
+                        <form method="post" action="{% url 'price_item_delete' pi.id %}" style="display:inline;"
+                              onsubmit="return confirm('确认删除「{{ pi.name }}」？')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <i class="bi bi-tags" style="font-size:40px; color:#cbd5e1;"></i>
+            <p style="color:#94a3b8; margin-top:12px;">
+                {% if q or cat_filter %}没有符合条件的价格项目{% else %}暂无价格项目{% endif %}
+            </p>
+            {% if can_manage and not q and not cat_filter %}
+            <button type="button" class="btn btn-primary btn-sm mt-2" onclick="openModal()">
+                <i class="bi bi-plus-lg me-1"></i>添加第一个价格项目
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if can_manage %}
+<!-- 增改弹窗 -->
+<div class="modal fade" id="priceModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:520px;">
+        <div class="modal-content" style="border-radius:14px; border:none; box-shadow:0 8px 40px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="border-bottom:1px solid #eef1f7; padding:18px 24px;">
+                <h5 class="modal-title" id="modalTitle" style="font-size:15px; font-weight:600;">新建价格项目</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'price_item_save' %}">
+                {% csrf_token %}
+                <input type="hidden" name="pk" id="fPk">
+                <div class="modal-body" style="padding:24px;">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label">分类 <span style="color:#dc2626;">*</span></label>
+                            <select name="category" id="fCategory" class="form-select">
+                                {% for v, l in cat_choices %}
+                                <option value="{{ v }}">{{ l }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">单位 <span style="color:#dc2626;">*</span></label>
+                            <input type="text" name="unit" id="fUnit" class="form-control" placeholder="如：㎡、项、套" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">项目名称 <span style="color:#dc2626;">*</span></label>
+                            <input type="text" name="name" id="fName" class="form-control" placeholder="如：客厅地砖铺贴" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">规格说明</label>
+                            <input type="text" name="spec" id="fSpec" class="form-control" placeholder="如：600×600mm 抛光砖">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">基准价格（元） <span style="color:#dc2626;">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">¥</span>
+                                <input type="number" name="base_price" id="fBasePrice" class="form-control"
+                                       min="0" step="0.01" placeholder="0.00" required oninput="updatePreview()">
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">浮动范围（%）</label>
+                            <div class="input-group">
+                                <input type="number" name="fluctuation" id="fFluctuation" class="form-control"
+                                       min="0" max="100" step="0.1" value="0" oninput="updatePreview()">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <div class="form-text" style="font-size:11px;">0 = 固定价格</div>
+                        </div>
+                        <div class="col-12">
+                            <div id="pricePreview" style="background:#f0fdf4; border-radius:8px; padding:10px 14px; font-size:13px; color:#065f46; display:none;">
+                                允许区间：<strong id="previewRange"></strong>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="fIsActive" value="1" checked>
+                                <label class="form-check-label" for="fIsActive" style="font-size:13.5px;">启用此价格项目</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #eef1f7; padding:14px 24px;">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary btn-sm">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{{ price_items_raw|json_script:"price-items-raw" }}
+<script>
+const ALL_ITEMS = JSON.parse(document.getElementById('price-items-raw').textContent);
+
+function openModal(id) {
+    const modal = new bootstrap.Modal(document.getElementById('priceModal'));
+    const titleEl = document.getElementById('modalTitle');
+    if (id) {
+        const item = ALL_ITEMS.find(p => p.id === id);
+        if (!item) return;
+        titleEl.textContent = '编辑价格项目';
+        document.getElementById('fPk').value         = item.id;
+        document.getElementById('fCategory').value   = item.category;
+        document.getElementById('fName').value        = item.name;
+        document.getElementById('fSpec').value        = item.spec || '';
+        document.getElementById('fUnit').value        = item.unit;
+        document.getElementById('fBasePrice').value   = item.base_price;
+        document.getElementById('fFluctuation').value = item.fluctuation;
+        document.getElementById('fIsActive').checked  = item.is_active;
+    } else {
+        titleEl.textContent = '新建价格项目';
+        document.getElementById('fPk').value          = '';
+        document.getElementById('fName').value         = '';
+        document.getElementById('fSpec').value         = '';
+        document.getElementById('fUnit').value         = '项';
+        document.getElementById('fBasePrice').value    = '';
+        document.getElementById('fFluctuation').value  = '0';
+        document.getElementById('fIsActive').checked   = true;
+    }
+    updatePreview();
+    modal.show();
+}
+
+function updatePreview() {
+    const base = parseFloat(document.getElementById('fBasePrice').value) || 0;
+    const fluc = parseFloat(document.getElementById('fFluctuation').value) || 0;
+    const preview = document.getElementById('pricePreview');
+    const rangeEl = document.getElementById('previewRange');
+    if (base <= 0) { preview.style.display = 'none'; return; }
+    preview.style.display = '';
+    if (fluc === 0) {
+        rangeEl.textContent = `¥${base.toFixed(2)}（固定）`;
+    } else {
+        const min = (base * (1 - fluc / 100)).toFixed(2);
+        const max = (base * (1 + fluc / 100)).toFixed(2);
+        rangeEl.textContent = `¥${min} ~ ¥${max}`;
+    }
+}
+</script>
+{% endif %}
+
+{% endblock %}
