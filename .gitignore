@@ -38,3 +38,6 @@ build/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# Claude Code 记忆文件（本地私有）
+.claude/
